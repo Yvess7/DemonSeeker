@@ -5,6 +5,9 @@
 
 > Esta pagina clasifica los demons para mantener una competitividad entre los jugadores pero tiene tendencia a fallar, por lo tanto tiene un demonio siempre atento a si la pagina está funcionando
 
+<img src="ref.png" width="500" alt="Example" />
+<img src="ref2.png" width="500" alt="Example" />
+
 ## Sobre el proyecto
 
 Este proyecto como tal es una demo pequeña para las paginas grandes como digamos [discord](https://discordstatus.com/) que usa algo como lo que usamos para mantener un monitore del sistma.
