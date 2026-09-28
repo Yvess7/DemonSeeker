@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DemonSeeker // DemonEye Sentinel Status</title>
+  <meta name="description" content="Panel de estado DemonEye con auto-reinicio real a nivel de proceso del sistema operativo.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=JetBrains+Mono:wght@500;700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="grid-overlay"></div>
+
+  <!-- Top Bar -->
+  <header class="top-nav">
+    <div class="nav-brand">
+      <div class="brand-text">
+        <h1 class="brand-title">DEMON<span>EYE</span></h1>
+        <span class="brand-sub">SUPERVISOR DE ALTA DISPONIBILIDAD // PROCESO REAL</span>
+      </div>
+    </div>
+
+    <div class="nav-status-group">
+      <div class="status-pill" id="nav-demoneye-pill">
+        <span class="status-dot"></span>
+        <span class="status-label">DEMONEYE:</span>
+        <span class="status-val" id="nav-demoneye-val">ACTIVO</span>
+      </div>
+
+      <button id="btn-force-crash-status" class="btn-force-crash" title="Terminar el proceso del servidor de verdad">
+        Forzar Caida Real
+      </button>
+
+      <a href="http://127.0.0.1:8000" class="btn-nav-status">
+        &larr; Volver a Lista de Demons (puerto 8000)
+      </a>
+    </div>
+  </header>
+
+  <!-- Status Content -->
+  <main class="main-container">
+    <!-- KPI Overview Cards -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <span class="kpi-label">ESTADO DEL API</span>
+        <span class="kpi-val highlight-emerald" id="kpi-api-status">OPERATIVO</span>
+        <span class="kpi-sub" id="kpi-api-sub">PID Activo: --</span>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-label">UPTIME CALCULADO</span>
+        <span class="kpi-val highlight-cyan" id="kpi-uptime">100.0%</span>
+        <span class="kpi-sub" id="kpi-total-checks">0 verificaciones</span>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-label">RESURRECCIONES REALES</span>
+        <span class="kpi-val highlight-amber" id="kpi-restarts">0</span>
+        <span class="kpi-sub">Procesos levantados por DemonEye</span>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-label">MODO CAIDAS RANDOM</span>
+        <span class="kpi-val" id="kpi-chaos-status">ACTIVO</span>
+        <button id="btn-toggle-chaos" class="btn-subtle">Cambiar Modo</button>
+      </div>
+    </section>
+
+    <!-- Countdown bar when restart is in progress -->
+    <div id="countdown-bar" class="down-banner" style="display:none;">
+      <div class="down-title">SERVIDOR CAIDO - REINICIO EN CURSO</div>
+      <div class="down-countdown" id="countdown-timer">--</div>
+      <div class="down-sub" id="countdown-sub">DemonEye detectó la muerte del proceso. Resucitando...</div>
+    </div>
+
+    <!-- Workspace Grid -->
+    <div class="status-workspace">
+      <!-- Left: Incidents & Health Stream -->
+      <section class="status-panel">
+        <h2 class="panel-title">HISTORIAL DE SALUD Y PULSOS</h2>
+
+        <div class="ping-stream-box">
+          <div class="stream-label">
+            <span>HISTORIAL DE LOS ULTIMOS 30 CHEQUEOS</span>
+            <span>Verde: Conectado | Rojo: Proceso Caido</span>
+          </div>
+          <div class="ping-stream" id="ping-stream-bars">
+            <!-- Dynamic bars -->
+          </div>
+        </div>
+
+        <div style="margin-top: 10px;">
+          <h3 style="font-size: 0.85rem; font-family: var(--font-display); color: var(--text-muted); margin-bottom: 10px;">
+            REGISTRO DE MUERTES Y RESURRECCIONES DE PROCESO
+          </h3>
+          <div class="incidents-list" id="incidents-container">
+            <div class="empty-state">
+              Sin incidentes registrados. El proceso backend corre estable.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: Real-time Sentinel Logs -->
+      <section class="status-panel">
+        <h2 class="panel-title">REGISTRO DE EVENTOS DEMONEYE</h2>
+
+        <div class="terminal-card">
+          <div class="terminal-top">
+            SUPERVISOR DEMONEYE // PUERTO 8001
+          </div>
+          <div class="terminal-content" id="sentinel-logs">
+            <div class="term-line info">[00:00:00] [DEMONEYE] Conectando con supervisor de procesos...</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const DEMONEYE_URL = "http://127.0.0.1:8001";
+    const BACKEND_URL = "http://127.0.0.1:8000";
+
+    const navDemonEyePill = document.getElementById("nav-demoneye-pill");
+    const navDemonEyeVal = document.getElementById("nav-demoneye-val");
+
+    const kpiApiStatus = document.getElementById("kpi-api-status");
+    const kpiApiSub = document.getElementById("kpi-api-sub");
+    const kpiUptime = document.getElementById("kpi-uptime");
+    const kpiTotalChecks = document.getElementById("kpi-total-checks");
+    const kpiRestarts = document.getElementById("kpi-restarts");
+    const kpiChaosStatus = document.getElementById("kpi-chaos-status");
+    const btnToggleChaos = document.getElementById("btn-toggle-chaos");
+    const btnForceCrashStatus = document.getElementById("btn-force-crash-status");
+    const countdownBar = document.getElementById("countdown-bar");
+    const countdownTimer = document.getElementById("countdown-timer");
+    const countdownSubEl = document.getElementById("countdown-sub");
+
+    const pingStreamBars = document.getElementById("ping-stream-bars");
+    const incidentsContainer = document.getElementById("incidents-container");
+    const sentinelLogs = document.getElementById("sentinel-logs");
+
+    function appendLog(msg, type = "info") {
+      const line = document.createElement("div");
+      const timeStr = new Date().toTimeString().split(" ")[0];
+      line.className = `term-line ${type}`;
+      line.textContent = `[${timeStr}] [DEMONEYE] ${msg}`;
+      sentinelLogs.appendChild(line);
+      sentinelLogs.scrollTop = sentinelLogs.scrollHeight;
+
+      while (sentinelLogs.children.length > 50) {
+        sentinelLogs.removeChild(sentinelLogs.firstChild);
+      }
+    }
+
+    async function fetchStatus() {
+      try {
+        const res = await fetch(`${DEMONEYE_URL}/status`, { signal: AbortSignal.timeout(1600) });
+        if (!res.ok) throw new Error("DemonEye HTTP Error");
+
+        const data = await res.json();
+        renderDemonEye(data);
+      } catch (err) {
+        navDemonEyePill.className = "status-pill status-error";
+        navDemonEyeVal.textContent = "DESCONECTADO";
+        kpiApiStatus.textContent = "DESCONOCIDO";
+        kpiApiStatus.className = "kpi-val highlight-red";
+      }
+    }
+
+    function renderDemonEye(data) {
+      navDemonEyePill.className = "status-pill";
+      navDemonEyeVal.textContent = "ACTIVO";
+
+      const isHealthy = data.status === "HEALTHY";
+      kpiApiStatus.textContent = isHealthy ? "OPERATIVO" : "RESUCITANDO PROCESO";
+      kpiApiStatus.className = isHealthy ? "kpi-val highlight-emerald" : "kpi-val highlight-red";
+      kpiApiSub.textContent = data.backend_pid ? `PID Proceso: ${data.backend_pid}` : "Esperando PID...";
+
+      kpiUptime.textContent = `${data.uptime_pct}%`;
+      kpiTotalChecks.textContent = `${data.total_checks} chequeos (${data.successful_checks} OK / ${data.failed_checks} Caidas)`;
+      kpiRestarts.textContent = data.auto_restarts_count || 0;
+      kpiChaosStatus.textContent = data.random_chaos_enabled ? "ACTIVADO" : "PAUSADO";
+
+      // Show/hide countdown bar
+      if (data.restart_countdown !== null && data.restart_countdown > 0) {
+        countdownBar.style.display = "flex";
+        countdownTimer.textContent = `Reinicio en ${data.restart_countdown}s`;
+        countdownSubEl.textContent = "El proceso del backend esta muerto. DemonEye lo resucitará.";
+      } else if (data.status === "CRITICAL_OUTAGE" && (data.restart_countdown === 0 || data.restart_countdown === null)) {
+        countdownBar.style.display = "flex";
+        countdownTimer.textContent = "Levantando proceso...";
+        countdownSubEl.textContent = "Esperando a que el nuevo servidor arranque.";
+      } else {
+        countdownBar.style.display = "none";
+      }
+
+      // Render Ping Bars
+      if (data.history && data.history.length > 0) {
+        pingStreamBars.innerHTML = "";
+        data.history.forEach(h => {
+          const bar = document.createElement("div");
+          const ok = h.status === "HEALTHY";
+          bar.className = `ping-bar ${ok ? "healthy" : "outage"}`;
+          bar.style.height = ok ? `${Math.min(Math.max((h.latency_ms / 30) * 100, 25), 90)}%` : "100%";
+          bar.title = `${h.status} (${h.latency_ms}ms)`;
+          pingStreamBars.appendChild(bar);
+        });
+      }
+
+      renderIncidents(data.incidents, data.current_outage);
+    }
+
+    function renderIncidents(incidents, currentOutage) {
+      const list = [...incidents];
+      if (currentOutage && !list.find(i => i.id === currentOutage.id)) {
+        list.unshift(currentOutage);
+      }
+
+      if (list.length === 0) {
+        incidentsContainer.innerHTML = `
+          <div class="empty-state">
+            Sin incidentes registrados. El proceso backend corre estable.
+          </div>
+        `;
+        return;
+      }
+
+      incidentsContainer.innerHTML = "";
+      list.forEach(inc => {
+        const item = document.createElement("div");
+        const isActive = inc.status === "RESTARTING" || inc.status === "ACTIVE";
+        item.className = `incident-card ${isActive ? "active" : "resolved"}`;
+
+        const startTime = inc.started_at ? inc.started_at.split("T")[1].slice(0, 8) : "--";
+        const duration = inc.duration_seconds ? `${inc.duration_seconds} seg` : "En curso...";
+
+        item.innerHTML = `
+          <div class="incident-info">
+            <strong>${inc.id}: ${inc.error || "Muerte de proceso"}</strong>
+            <span>Inicio: ${startTime} UTC | Duracion: ${duration} | ${inc.resolution || "Reiniciando"}</span>
+          </div>
+          <span class="incident-tag ${isActive ? "active" : "resolved"}">
+            ${isActive ? "RESUCITANDO" : "RESUELTO"}
+          </span>
+        `;
+        incidentsContainer.appendChild(item);
+      });
+    }
+
+    // Force Crash
+    btnForceCrashStatus.addEventListener("click", async () => {
+      btnForceCrashStatus.disabled = true;
+      btnForceCrashStatus.textContent = "Matando proceso...";
+      appendLog("Orden de muerte enviada al proceso del backend...", "alert");
+
+      try {
+        await fetch(`${DEMONEYE_URL}/force-crash`, { method: "POST" });
+      } catch (e) {}
+
+      setTimeout(() => {
+        btnForceCrashStatus.disabled = false;
+        btnForceCrashStatus.textContent = "Forzar Caida Real";
+        fetchStatus();
+      }, 1500);
+    });
+
+    // Toggle Random Chaos
+    btnToggleChaos.addEventListener("click", async () => {
+      try {
+        const res = await fetch(`${DEMONEYE_URL}/toggle-chaos`, { method: "POST" });
+        if (res.ok) {
+          const data = await res.json();
+          appendLog(`Modo caidas aleatorias: ${data.random_chaos_enabled ? 'ACTIVADO' : 'PAUSADO'}`, "info");
+          fetchStatus();
+        }
+      } catch (e) {}
+    });
+
+    appendLog("Panel DemonEye iniciado. Vigilando el proceso del servidor...", "info");
+    fetchStatus();
+    setInterval(fetchStatus, 1800);
+  </script>
+</body>
+</html>

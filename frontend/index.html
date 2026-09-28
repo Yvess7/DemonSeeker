@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DemonSeeker // Geometry Dash Top 50 Extreme Demons & DemonEye</title>
+  <meta name="description" content="Lista Top 50 Extreme Demons de Geometry Dash con telemetría en tiempo real y supervisor DemonEye.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=JetBrains+Mono:wght@500;700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="grid-overlay"></div>
+
+  <!-- Top Navigation / Status Bar -->
+  <header class="top-nav">
+    <div class="nav-brand">
+      <div class="brand-text">
+        <h1 class="brand-title">DEMON<span>SEEKER</span></h1>
+        <span class="brand-sub">GEOMETRY DASH // TOP 50 AREDL LIST</span>
+      </div>
+    </div>
+
+    <!-- Live Status Chip, Force Crash Button & Link to Status Page -->
+    <div class="nav-status-group">
+      <div class="status-pill" id="nav-status-pill">
+        <span class="status-dot"></span>
+        <span class="status-label">ESTADO API:</span>
+        <span class="status-val" id="nav-status-val">CONECTANDO...</span>
+      </div>
+
+      <button id="btn-force-crash" class="btn-force-crash" title="Termina el proceso del servidor de verdad">
+        Forzar Caida Real
+      </button>
+
+      <a href="http://127.0.0.1:8001/status.html" class="btn-nav-status" target="_blank">
+        Panel DemonEye (puerto 8001) &rarr;
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Content: Demons List -->
+  <main class="main-container">
+    <div class="section-header">
+      <div class="section-title-wrap">
+        <h2 class="section-title">TOP 50 EXTREME DEMONS</h2>
+        <span class="section-count" id="demons-count-badge">50 / 50</span>
+      </div>
+
+      <div class="search-box">
+        <input type="text" id="input-search" placeholder="Buscar por nivel o creador...">
+      </div>
+    </div>
+
+    <!-- Down Banner (visible when backend is dead) -->
+    <div id="down-banner" class="down-banner" style="display:none;">
+      <div class="down-title">EL SERVIDOR ESTA CAIDO</div>
+      <div class="down-sub" id="down-sub">DemonEye esta preparando la resurreccion del proceso...</div>
+      <div class="down-countdown" id="down-countdown"></div>
+      <a href="http://127.0.0.1:8001/status.html" class="btn-nav-status" target="_blank">
+        Ver estado en tiempo real en DemonEye &rarr;
+      </a>
+    </div>
+
+    <!-- Large Demon Rows Feed -->
+    <div class="demons-list" id="demons-container">
+      <div class="empty-state">
+        Cargando listado de Extreme Demons...
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const BACKEND_URL = "http://127.0.0.1:8000";
+    const DEMONEYE_URL = "http://127.0.0.1:8001";
+
+    const navStatusPill = document.getElementById("nav-status-pill");
+    const navStatusVal = document.getElementById("nav-status-val");
+    const demonsContainer = document.getElementById("demons-container");
+    const demonsCountBadge = document.getElementById("demons-count-badge");
+    const inputSearch = document.getElementById("input-search");
+    const btnForceCrash = document.getElementById("btn-force-crash");
+    const downBanner = document.getElementById("down-banner");
+    const downSub = document.getElementById("down-sub");
+    const downCountdown = document.getElementById("down-countdown");
+
+    let allDemons = [];
+    let query = "";
+
+    async function checkStatus() {
+      let backendAlive = false;
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/health`, { signal: AbortSignal.timeout(1500) });
+        if (res.ok) backendAlive = true;
+      } catch (e) {}
+
+      if (backendAlive) {
+        navStatusPill.className = "status-pill";
+        navStatusVal.textContent = "OPERATIVO";
+        btnForceCrash.disabled = false;
+        btnForceCrash.textContent = "Forzar Caida Real";
+        downBanner.style.display = "none";
+      } else {
+        navStatusPill.className = "status-pill status-error";
+        navStatusVal.textContent = "CAIDO";
+        downBanner.style.display = "flex";
+
+        // Fetch DemonEye countdown
+        try {
+          const dRes = await fetch(`${DEMONEYE_URL}/status`, { signal: AbortSignal.timeout(1200) });
+          if (dRes.ok) {
+            const dData = await dRes.json();
+            if (dData.restart_countdown !== null && dData.restart_countdown > 0) {
+              downCountdown.textContent = `Reinicio en ${dData.restart_countdown}s`;
+              downSub.textContent = "El proceso del servidor fue terminado. DemonEye lo resucitara pronto.";
+            } else if (dData.status === "CRITICAL_OUTAGE") {
+              downCountdown.textContent = "Iniciando nuevo proceso...";
+              downSub.textContent = "El supervisor DemonEye esta levantando un nuevo servidor.";
+            }
+          }
+        } catch (e2) {
+          downCountdown.textContent = "";
+          downSub.textContent = "Esperando respuesta del supervisor DemonEye...";
+        }
+      }
+    }
+
+    async function loadDemons() {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/demons?limit=50`, { signal: AbortSignal.timeout(2000) });
+        if (res.ok) {
+          allDemons = await res.json();
+          renderDemons();
+        }
+      } catch (e) {
+        // Ignored during crash/restart cycle
+      }
+    }
+
+    function renderDemons() {
+      let list = allDemons;
+      if (query.trim()) {
+        const q = query.toLowerCase();
+        list = list.filter(d => 
+          (d.name && d.name.toLowerCase().includes(q)) || 
+          (d.creator && d.creator.toLowerCase().includes(q))
+        );
+      }
+
+      demonsCountBadge.textContent = `${list.length} / ${allDemons.length || 50}`;
+
+      if (list.length === 0) {
+        demonsContainer.innerHTML = `
+          <div class="empty-state">
+            No se encontraron niveles que coincidan con "${query}".
+          </div>
+        `;
+        return;
+      }
+
+      demonsContainer.innerHTML = "";
+      list.forEach(demon => {
+        const row = document.createElement("div");
+        const rankClass = demon.position === 1 ? "rank-1" 
+          : demon.position === 2 ? "rank-2" 
+          : demon.position === 3 ? "rank-3" 
+          : demon.position <= 10 ? "rank-top10" : "";
+
+        row.className = `gd-row-card ${rankClass}`;
+        row.innerHTML = `
+          <div class="gd-row-left">
+            <div class="gd-rank-box">#${demon.position}</div>
+            <div class="gd-details">
+              <div class="gd-level-name">${demon.name}</div>
+              <div class="gd-level-creator">Creado por <strong>${demon.creator}</strong></div>
+            </div>
+          </div>
+          <div class="gd-row-right">
+            <span class="badge-tier">Extreme Demon</span>
+          </div>
+        `;
+        demonsContainer.appendChild(row);
+      });
+    }
+
+    // Force Crash Click Handler
+    btnForceCrash.addEventListener("click", async () => {
+      btnForceCrash.disabled = true;
+      btnForceCrash.textContent = "Matando proceso...";
+      navStatusPill.className = "status-pill status-error";
+      navStatusVal.textContent = "DEMONEYE RESUCITANDO...";
+
+      try {
+        await fetch(`${DEMONEYE_URL}/force-crash`, { method: "POST" });
+      } catch (err) {
+        try {
+          await fetch(`${BACKEND_URL}/api/crash`, { method: "POST" });
+        } catch (e) {}
+      }
+
+      setTimeout(checkStatus, 1200);
+      setTimeout(loadDemons, 2000);
+    });
+
+    inputSearch.addEventListener("input", (e) => {
+      query = e.target.value;
+      renderDemons();
+    });
+
+    checkStatus();
+    loadDemons();
+
+    setInterval(checkStatus, 2000);
+    setInterval(loadDemons, 4000);
+  </script>
+</body>
+</html>
