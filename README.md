@@ -1,7 +1,7 @@
 
 # DemonSeeker
 
->  **Geometry Dash Top 50 Extreme Demons**
+>  **Geometry Dash Top 50 Extreme Demonssss**
 
 > Esta pagina clasifica los demons para mantener una competitividad entre los jugadores pero tiene tendencia a fallar, por lo tanto tiene un demonio siempre atento a si la pagina está funcionando
 
